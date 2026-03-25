@@ -1,6 +1,6 @@
 ## Tests for CDC pipeline: framing, chunking, cache, receiver.
 
-import std/unittest
+import std/[unittest, strutils]
 import dbcdc/framing
 import dbcdc/chunking
 import dbcdc/cache
@@ -133,3 +133,146 @@ suite "receiver":
     let encoded = encode_frame(frame)
     let result = recv.dispatch(encoded)
     check result.is_bad
+
+# =====================================================================================================================
+# negotiate
+# =====================================================================================================================
+
+import dbcdc/negotiate
+
+suite "negotiate":
+  test "encode/decode capability round-trip":
+    let cap = Capability(tiers: {tierRaw, tierDelta}, schema_version: 3, last_seq: 42)
+    let encoded = encode_capability(cap)
+    let decoded = decode_capability(encoded)
+    check decoded.is_good
+    check tierRaw in decoded.val.tiers
+    check tierDelta in decoded.val.tiers
+    check tierCompact notin decoded.val.tiers
+    check decoded.val.schema_version == 3
+    check decoded.val.last_seq == 42
+
+  test "negotiate common tiers":
+    let sender = Capability(tiers: {tierRaw, tierDelta}, schema_version: 2, last_seq: 10)
+    let receiver = Capability(tiers: {tierDelta, tierCompact}, schema_version: 3, last_seq: 5)
+    let resp = negotiate(sender, receiver)
+    check resp.accepted
+    check tierDelta in resp.receiver_caps.tiers
+    check resp.resume_from == 10
+
+  test "negotiate no common tiers":
+    let sender = Capability(tiers: {tierRaw}, schema_version: 1, last_seq: 0)
+    let receiver = Capability(tiers: {tierCompact}, schema_version: 1, last_seq: 0)
+    let resp = negotiate(sender, receiver)
+    check not resp.accepted
+
+# =====================================================================================================================
+# sp_binding
+# =====================================================================================================================
+
+import dbcdc/sp_binding
+
+suite "sp_binding":
+  test "make negotiate frame":
+    let cap = Capability(tiers: {tierRaw}, schema_version: 1, last_seq: 0)
+    let frame = make_negotiate_frame(cap)
+    check frame.kind == fkSync
+    check frame.payload.len == 13
+
+  test "make ack frame":
+    let frame = make_ack_frame(42)
+    check frame.kind == fkAck
+    check frame.seq_no == 42
+
+  test "make changeset frame":
+    let frame = make_changeset_frame(tierDelta, 10, @[1'u8, 2, 3])
+    check frame.tier == tierDelta
+    check frame.kind == fkChangeset
+    check frame.seq_no == 10
+    check frame.payload == @[1'u8, 2, 3]
+
+# =====================================================================================================================
+# changeset_cdc
+# =====================================================================================================================
+
+import dbcdc/changeset_cdc
+
+suite "changeset_cdc":
+  test "publish and cache":
+    var pub = init_changeset_publisher("tcp://localhost:9000")
+    let data = @[10'u8, 20, 30]
+    let result = pub.publish_changeset(data)
+    check result.is_good
+    check result.val.seq_no == 1
+    check result.val.payload == data
+    let cached = pub.get_cached(1)
+    check cached.is_good
+    check cached.val == data
+
+  test "sequence increments":
+    var pub = init_changeset_publisher("tcp://localhost:9000")
+    discard pub.publish_changeset(@[1'u8])
+    let r2 = pub.publish_changeset(@[2'u8])
+    check r2.is_good
+    check r2.val.seq_no == 2
+
+# =====================================================================================================================
+# delta_compress
+# =====================================================================================================================
+
+import dbcdc/delta_compress
+
+suite "delta_compress":
+  test "first message emits raw":
+    var dc = init_compressor()
+    let r = dc.compress(1, @[1'u8, 2, 3], proc(s, t: seq[byte]): string = "delta")
+    check r.is_good
+    check r.val.tier == tierRaw
+
+  test "second message uses delta if smaller":
+    var dc = init_compressor()
+    let big = newSeq[byte](100)
+    discard dc.compress(1, big, proc(s, t: seq[byte]): string = "small")
+    let r = dc.compress(2, big, proc(s, t: seq[byte]): string = "small")
+    check r.is_good
+    check r.val.tier == tierDelta
+
+  test "falls back to raw if delta is larger":
+    var dc = init_compressor()
+    let small = @[1'u8, 2]
+    discard dc.compress(1, small, proc(s, t: seq[byte]): string = "this delta is much larger than the original data!!!")
+    let r = dc.compress(2, small, proc(s, t: seq[byte]): string = "this delta is much larger than the original data!!!")
+    check r.is_good
+    check r.val.tier == tierRaw
+
+# =====================================================================================================================
+# replay
+# =====================================================================================================================
+
+import dbcdc/replay
+
+suite "replay":
+  test "replay insert":
+    let stmt = replay_insert("users", @["id", "name"], @["1", "'alice'"])
+    check stmt.sql.contains("INSERT INTO users")
+    check stmt.sql.contains("1, 'alice'")
+
+  test "replay delete":
+    let stmt = replay_delete("users", @["id"], @["1"])
+    check stmt.sql.contains("DELETE FROM users")
+    check stmt.sql.contains("id = 1")
+
+  test "replay update":
+    let stmt = replay_update("users", @["id"], @["1"], @["name"], @["'bob'"])
+    check stmt.sql.contains("UPDATE users SET")
+    check stmt.sql.contains("name = 'bob'")
+    check stmt.sql.contains("id = 1")
+
+  test "wrap transaction":
+    let stmts = wrap_transaction(@[
+      ReplayStatement(sql: "INSERT INTO t VALUES(1)"),
+      ReplayStatement(sql: "INSERT INTO t VALUES(2)"),
+    ])
+    check stmts.len == 4
+    check stmts[0].sql == "BEGIN"
+    check stmts[3].sql == "COMMIT"
