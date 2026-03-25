@@ -1,6 +1,6 @@
 {.experimental: "strict_funcs".}
 import std/[unittest, strutils, tables]
-import dbcdc
+import change
 suite "event":
   test "create insert event":
     let e = insert_event("sqlite", "users", "1", {"name": "alice"}.toTable)

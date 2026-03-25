@@ -1,10 +1,10 @@
 ## Tests for CDC pipeline: framing, chunking, cache, receiver.
 
 import std/[unittest, strutils]
-import dbcdc/framing
-import dbcdc/chunking
-import dbcdc/cache
-import dbcdc/receiver
+import change/framing
+import change/chunking
+import change/cache
+import change/receiver
 import basis/code/choice
 
 # =====================================================================================================================
@@ -138,7 +138,7 @@ suite "receiver":
 # negotiate
 # =====================================================================================================================
 
-import dbcdc/negotiate
+import change/negotiate
 
 suite "negotiate":
   test "encode/decode capability round-trip":
@@ -170,7 +170,7 @@ suite "negotiate":
 # sp_binding
 # =====================================================================================================================
 
-import dbcdc/sp_binding
+import change/sp_binding
 
 suite "sp_binding":
   test "make negotiate frame":
@@ -195,7 +195,7 @@ suite "sp_binding":
 # changeset_cdc
 # =====================================================================================================================
 
-import dbcdc/changeset_cdc
+import change/changeset_cdc
 
 suite "changeset_cdc":
   test "publish and cache":
@@ -220,7 +220,7 @@ suite "changeset_cdc":
 # delta_compress
 # =====================================================================================================================
 
-import dbcdc/delta_compress
+import change/delta_compress
 
 suite "delta_compress":
   test "first message emits raw":
@@ -249,7 +249,7 @@ suite "delta_compress":
 # replay
 # =====================================================================================================================
 
-import dbcdc/replay
+import change/replay
 
 suite "replay":
   test "replay insert":
