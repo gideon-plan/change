@@ -1,13 +1,13 @@
 ## subscriber.nim -- SP subscriber dispatching CDC events.
 {.experimental: "strict_funcs".}
 import std/[strutils, tables]
-import lattice, event
+import basis/code/choice, event
 type
   CdcHandler* = proc(event: CdcEvent) {.raises: [].}
-proc parse_event*(topic, payload: string): Result[CdcEvent, BridgeError] =
+proc parse_event*(topic, payload: string): Choice[CdcEvent] =
   let parts = topic.split("/")
   if parts.len < 3:
-    return Result[CdcEvent, BridgeError].bad(BridgeError(msg: "invalid topic: " & topic))
+    return bad[CdcEvent]("dbcdc", "invalid topic: " & topic)
   let db = parts[1]
   let table = parts[2]
   var op = cdcInsert
@@ -26,5 +26,5 @@ proc parse_event*(topic, payload: string): Result[CdcEvent, BridgeError] =
         else: discard
       elif k == "key": key = v
       else: values[k] = v
-  Result[CdcEvent, BridgeError].good(
+  good(
     CdcEvent(op: op, db: db, table_name: table, row_key: key, new_values: values))
