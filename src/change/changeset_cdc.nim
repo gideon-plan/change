@@ -7,14 +7,14 @@
 {.experimental: "strict_funcs".}
 
 import basis/code/choice
-import framing, cache, sp_binding
+import framing, cache, hydra
 
 type
   ChangesetPublisher* = object
     cache*: ChangesetCache
     next_seq*: uint64
     tier*: ChangeTier
-    binding*: SpchangeBinding
+    binding*: HydraChangeBinding
 
 proc init_changeset_publisher*(endpoint: string, tier: ChangeTier = tierRaw,
                                 cache_size: int = 64): ChangesetPublisher =
