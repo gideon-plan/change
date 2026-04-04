@@ -13,7 +13,7 @@ import framing
 
 type
   Capability* = object
-    tiers*: set[CdcTier]
+    tiers*: set[ChangeTier]
     schema_version*: int
     last_seq*: uint64
 
@@ -44,8 +44,8 @@ func encode_capability*(cap: Capability): seq[byte] =
 func decode_capability*(data: openArray[byte]): Choice[Capability] =
   ## Decode capability from bytes.
   if data.len < 13:
-    return bad[Capability]("dbcdc", "capability too short")
-  var tiers: set[CdcTier] = {}
+    return bad[Capability]("change", "capability too short")
+  var tiers: set[ChangeTier] = {}
   if (data[0] and 1) != 0: tiers.incl(tierRaw)
   if (data[0] and 2) != 0: tiers.incl(tierDelta)
   if (data[0] and 4) != 0: tiers.incl(tierCompact)

@@ -1,16 +1,16 @@
-## subscriber.nim -- SP subscriber dispatching CDC events.
+## subscriber.nim -- SP subscriber dispatching change events.
 {.experimental: "strict_funcs".}
 import std/[strutils, tables]
 import basis/code/choice, event
 type
-  CdcHandler* = proc(event: CdcEvent) {.raises: [].}
-proc parse_event*(topic, payload: string): Choice[CdcEvent] =
+  changeHandler* = proc(event: ChangeEvent) {.raises: [].}
+proc parse_event*(topic, payload: string): Choice[ChangeEvent] =
   let parts = topic.split("/")
   if parts.len < 3:
-    return bad[CdcEvent]("dbcdc", "invalid topic: " & topic)
+    return bad[ChangeEvent]("change", "invalid topic: " & topic)
   let db = parts[1]
   let table = parts[2]
-  var op = cdcInsert
+  var op = changeInsert
   var key = ""
   var values: Table[string, string]
   for line in payload.splitLines():
@@ -20,11 +20,11 @@ proc parse_event*(topic, payload: string): Choice[CdcEvent] =
       let v = line[eq+1 ..< line.len]
       if k == "op":
         case v
-        of "cdcInsert": op = cdcInsert
-        of "cdcUpdate": op = cdcUpdate
-        of "cdcDelete": op = cdcDelete
+        of "changeInsert": op = changeInsert
+        of "changeUpdate": op = changeUpdate
+        of "changeDelete": op = changeDelete
         else: discard
       elif k == "key": key = v
       else: values[k] = v
   good(
-    CdcEvent(op: op, db: db, table_name: table, row_key: key, new_values: values))
+    ChangeEvent(op: op, db: db, table_name: table, row_key: key, new_values: values))

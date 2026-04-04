@@ -15,7 +15,7 @@ type
     total_chunks*: uint16
     data*: seq[byte]
 
-proc split_frame*(frame: CdcFrame, max_size: int = DEFAULT_CHUNK_SIZE): seq[Chunk] =
+proc split_frame*(frame: ChangeFrame, max_size: int = DEFAULT_CHUNK_SIZE): seq[Chunk] =
   ## Split a frame into chunks if payload exceeds max_size.
   let encoded = encode_frame(frame)
   if encoded.len <= max_size:
@@ -35,10 +35,10 @@ proc split_frame*(frame: CdcFrame, max_size: int = DEFAULT_CHUNK_SIZE): seq[Chun
       data: chunk_data
     )
 
-proc reassemble_chunks*(chunks: seq[Chunk]): Choice[CdcFrame] =
+proc reassemble_chunks*(chunks: seq[Chunk]): Choice[ChangeFrame] =
   ## Reassemble chunks into a frame.
   if chunks.len == 0:
-    return bad[CdcFrame]("dbcdc", "no chunks to reassemble")
+    return bad[ChangeFrame]("change", "no chunks to reassemble")
   if chunks.len == 1 and chunks[0].total_chunks == 1:
     return decode_frame(chunks[0].data)
   # Sort by index and concatenate

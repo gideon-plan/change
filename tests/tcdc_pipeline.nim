@@ -1,4 +1,5 @@
-## Tests for CDC pipeline: framing, chunking, cache, receiver.
+{.experimental: "strictFuncs".}
+## Tests for change pipeline: framing, chunking, cache, receiver.
 
 import std/[unittest, strutils]
 import change/framing
@@ -13,7 +14,7 @@ import basis/code/choice
 
 suite "framing":
   test "encode/decode round-trip":
-    let frame = CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42,
+    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42,
                          payload: @[1'u8, 2, 3, 4, 5])
     let encoded = encode_frame(frame)
     let decoded = decode_frame(encoded)
@@ -24,7 +25,7 @@ suite "framing":
     check decoded.val.payload == @[1'u8, 2, 3, 4, 5]
 
   test "empty payload":
-    let frame = CdcFrame(tier: tierDelta, kind: fkAck, seq_no: 1, payload: @[])
+    let frame = ChangeFrame(tier: tierDelta, kind: fkAck, seq_no: 1, payload: @[])
     let encoded = encode_frame(frame)
     let decoded = decode_frame(encoded)
     check decoded.is_good
@@ -40,14 +41,14 @@ suite "framing":
 
 suite "chunking":
   test "small frame produces single chunk":
-    let frame = CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
+    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
                          payload: @[1'u8, 2, 3])
     let chunks = split_frame(frame)
     check chunks.len == 1
     check chunks[0].total_chunks == 1
 
   test "reassemble single chunk":
-    let frame = CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
+    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
                          payload: @[10'u8, 20, 30])
     let chunks = split_frame(frame)
     let result = reassemble_chunks(chunks)
@@ -58,7 +59,7 @@ suite "chunking":
   test "large frame splits and reassembles":
     var payload = newSeq[byte](200)
     for i in 0 ..< 200: payload[i] = byte(i mod 256)
-    let frame = CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: 99, payload: payload)
+    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 99, payload: payload)
     let chunks = split_frame(frame, max_size = 100)
     check chunks.len > 1
     let result = reassemble_chunks(chunks)
@@ -117,11 +118,11 @@ suite "receiver":
   test "dispatch to handler":
     var received_seq: uint64 = 0
     var recv = init_receiver()
-    recv.set_handler(tierRaw, proc(f: CdcFrame): Choice[bool] {.raises: [].} =
+    recv.set_handler(tierRaw, proc(f: ChangeFrame): Choice[bool] {.raises: [].} =
       received_seq = f.seq_no
       good(true)
     )
-    let frame = CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42, payload: @[])
+    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42, payload: @[])
     let encoded = encode_frame(frame)
     let result = recv.dispatch(encoded)
     check result.is_good
@@ -129,7 +130,7 @@ suite "receiver":
 
   test "no handler returns bad":
     let recv = init_receiver()
-    let frame = CdcFrame(tier: tierDelta, kind: fkChangeset, seq_no: 1, payload: @[])
+    let frame = ChangeFrame(tier: tierDelta, kind: fkChangeset, seq_no: 1, payload: @[])
     let encoded = encode_frame(frame)
     let result = recv.dispatch(encoded)
     check result.is_bad
@@ -192,12 +193,12 @@ suite "sp_binding":
     check frame.payload == @[1'u8, 2, 3]
 
 # =====================================================================================================================
-# changeset_cdc
+# changeset_change
 # =====================================================================================================================
 
-import change/changeset_cdc
+import change/changeset_change
 
-suite "changeset_cdc":
+suite "changeset_change":
   test "publish and cache":
     var pub = init_changeset_publisher("tcp://localhost:9000")
     let data = @[10'u8, 20, 30]

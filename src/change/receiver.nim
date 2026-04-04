@@ -1,6 +1,6 @@
 ## receiver.nim -- Tier dispatcher.
 ##
-## Routes incoming CDC frames to the appropriate handler based on tier.
+## Routes incoming change frames to the appropriate handler based on tier.
 
 {.experimental: "strict_funcs".}
 
@@ -8,22 +8,22 @@ import basis/code/choice
 import framing
 
 type
-  TierHandler* = proc(frame: CdcFrame): Choice[bool] {.raises: [].}
+  TierHandler* = proc(frame: ChangeFrame): Choice[bool] {.raises: [].}
 
-  CdcReceiver* = object
-    handlers*: array[CdcTier, TierHandler]
+  changeReceiver* = object
+    handlers*: array[ChangeTier, TierHandler]
 
-proc init_receiver*(): CdcReceiver =
+proc init_receiver*(): changeReceiver =
   discard  # handlers default to nil
 
-proc set_handler*(recv: var CdcReceiver, tier: CdcTier, handler: TierHandler) =
+proc set_handler*(recv: var changeReceiver, tier: ChangeTier, handler: TierHandler) =
   recv.handlers[tier] = handler
 
-proc dispatch*(recv: CdcReceiver, data: openArray[byte]): Choice[bool] =
+proc dispatch*(recv: changeReceiver, data: openArray[byte]): Choice[bool] =
   ## Decode a frame and dispatch to the appropriate tier handler.
   let frame = decode_frame(data)
   if frame.is_bad: return bad[bool](frame.err)
   let handler = recv.handlers[frame.val.tier]
   if handler == nil:
-    return bad[bool]("dbcdc", "no handler for tier " & $frame.val.tier)
+    return bad[bool]("change", "no handler for tier " & $frame.val.tier)
   handler(frame.val)

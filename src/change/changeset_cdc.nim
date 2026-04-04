@@ -1,8 +1,8 @@
-## changeset_cdc.nim -- SQLite Session hook -> tiered publish.
+## changeset_change.nim -- SQLite Session hook -> tiered publish.
 ##
-## Bridges SQLite's Session Extension changeset output to the CDC
+## Bridges SQLite's Session Extension changeset output to the change
 ## tiered transport. Captures changesets and publishes them as
-## CdcFrames via the framing layer.
+## ChangeFrames via the framing layer.
 
 {.experimental: "strict_funcs".}
 
@@ -13,10 +13,10 @@ type
   ChangesetPublisher* = object
     cache*: ChangesetCache
     next_seq*: uint64
-    tier*: CdcTier
-    binding*: SpCdcBinding
+    tier*: ChangeTier
+    binding*: SpchangeBinding
 
-proc init_changeset_publisher*(endpoint: string, tier: CdcTier = tierRaw,
+proc init_changeset_publisher*(endpoint: string, tier: ChangeTier = tierRaw,
                                 cache_size: int = 64): ChangesetPublisher =
   ChangesetPublisher(
     cache: init_cache(cache_size),
@@ -25,8 +25,8 @@ proc init_changeset_publisher*(endpoint: string, tier: CdcTier = tierRaw,
     binding: new_pubsub_binding(endpoint)
   )
 
-proc publish_changeset*(pub: var ChangesetPublisher, data: seq[byte]): Choice[CdcFrame] =
-  ## Accept a raw changeset blob, cache it, and produce a CdcFrame for transport.
+proc publish_changeset*(pub: var ChangesetPublisher, data: seq[byte]): Choice[ChangeFrame] =
+  ## Accept a raw changeset blob, cache it, and produce a ChangeFrame for transport.
   let seq_no = pub.next_seq
   inc pub.next_seq
   pub.cache.put(seq_no, data)

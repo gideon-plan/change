@@ -16,7 +16,7 @@ proc init_compressor*(cache_size: int = 64): DeltaCompressor =
   DeltaCompressor(cache: init_cache(cache_size))
 
 proc compress*(dc: var DeltaCompressor, seq_no: uint64, data: seq[byte],
-               encode_fn: proc(source, target: seq[byte]): string): Choice[CdcFrame] =
+               encode_fn: proc(source, target: seq[byte]): string): Choice[ChangeFrame] =
   ## Delta-encode the current changeset against the previous one.
   ## If no previous changeset is cached, emit as raw.
   let prev = dc.cache.latest()
@@ -24,7 +24,7 @@ proc compress*(dc: var DeltaCompressor, seq_no: uint64, data: seq[byte],
 
   if prev.is_none or prev.val.data.len == 0:
     # No previous: emit raw
-    return good(CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: seq_no, payload: data))
+    return good(ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: seq_no, payload: data))
 
   # Delta-encode against previous
   let delta_str = encode_fn(prev.val.data, data)
@@ -33,11 +33,11 @@ proc compress*(dc: var DeltaCompressor, seq_no: uint64, data: seq[byte],
 
   # Only use delta if it's smaller than raw
   if delta_bytes.len < data.len:
-    good(CdcFrame(tier: tierDelta, kind: fkChangeset, seq_no: seq_no, payload: delta_bytes))
+    good(ChangeFrame(tier: tierDelta, kind: fkChangeset, seq_no: seq_no, payload: delta_bytes))
   else:
-    good(CdcFrame(tier: tierRaw, kind: fkChangeset, seq_no: seq_no, payload: data))
+    good(ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: seq_no, payload: data))
 
-proc decompress*(dc: DeltaCompressor, frame: CdcFrame,
+proc decompress*(dc: DeltaCompressor, frame: ChangeFrame,
                  decode_fn: proc(source: seq[byte], delta: string): Choice[seq[byte]]): Choice[seq[byte]] =
   ## Decompress a delta-encoded frame using the cached previous changeset.
   if frame.tier == tierRaw:
@@ -45,7 +45,7 @@ proc decompress*(dc: DeltaCompressor, frame: CdcFrame,
 
   let prev = dc.cache.latest()
   if prev.is_none:
-    return bad[seq[byte]]("dbcdc", "no previous changeset for delta decompression")
+    return bad[seq[byte]]("change", "no previous changeset for delta decompression")
 
   var delta_str = newString(frame.payload.len)
   for i, b in frame.payload: delta_str[i] = char(b)
