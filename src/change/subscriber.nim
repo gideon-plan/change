@@ -10,7 +10,7 @@ proc parse_event*(topic, payload: string): Choice[ChangeEvent] =
     return bad[ChangeEvent]("change", "invalid topic: " & topic)
   let db = parts[1]
   let table = parts[2]
-  var op = changeInsert
+  var op = changeOp.ChangeInsert
   var key = ""
   var values: Table[string, string]
   for line in payload.splitLines():
@@ -20,9 +20,9 @@ proc parse_event*(topic, payload: string): Choice[ChangeEvent] =
       let v = line[eq+1 ..< line.len]
       if k == "op":
         case v
-        of "changeInsert": op = changeInsert
-        of "changeUpdate": op = changeUpdate
-        of "changeDelete": op = changeDelete
+        of "changeOp.ChangeInsert": op = changeOp.ChangeInsert
+        of "changeOp.ChangeUpdate": op = changeOp.ChangeUpdate
+        of "changeOp.ChangeDelete": op = changeOp.ChangeDelete
         else: discard
       elif k == "key": key = v
       else: values[k] = v

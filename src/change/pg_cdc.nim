@@ -13,9 +13,9 @@ proc parse_pg_notify*(notif: PgNotification): Choice[ChangeEvent] =
   if parts.len < 3:
     return bad[ChangeEvent]("change", "invalid pg notify")
   let op = case parts[0]
-    of "INSERT": changeInsert
-    of "UPDATE": changeUpdate
-    of "DELETE": changeDelete
-    else: changeInsert
+    of "INSERT": changeOp.ChangeInsert
+    of "UPDATE": changeOp.ChangeUpdate
+    of "DELETE": changeOp.ChangeDelete
+    else: changeOp.ChangeInsert
   good(
     ChangeEvent(op: op, db: "postgres", table_name: parts[1], row_key: parts[2]))

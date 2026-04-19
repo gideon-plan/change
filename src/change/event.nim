@@ -3,7 +3,7 @@
 import std/tables
 type
   changeOp* = enum
-    changeInsert, changeUpdate, changeDelete
+    changeOp.ChangeInsert, changeOp.ChangeUpdate, changeOp.ChangeDelete
   ChangeEvent* = object
     op*: changeOp
     db*: string
@@ -12,8 +12,8 @@ type
     old_values*: Table[string, string]
     new_values*: Table[string, string]
 proc insert_event*(db, table, key: string, values: Table[string, string]): ChangeEvent =
-  ChangeEvent(op: changeInsert, db: db, table_name: table, row_key: key, new_values: values)
+  ChangeEvent(op: changeOp.ChangeInsert, db: db, table_name: table, row_key: key, new_values: values)
 proc update_event*(db, table, key: string, old_vals, new_vals: Table[string, string]): ChangeEvent =
-  ChangeEvent(op: changeUpdate, db: db, table_name: table, row_key: key, old_values: old_vals, new_values: new_vals)
+  ChangeEvent(op: changeOp.ChangeUpdate, db: db, table_name: table, row_key: key, old_values: old_vals, new_values: new_vals)
 proc delete_event*(db, table, key: string): ChangeEvent =
-  ChangeEvent(op: changeDelete, db: db, table_name: table, row_key: key)
+  ChangeEvent(op: changeOp.ChangeDelete, db: db, table_name: table, row_key: key)

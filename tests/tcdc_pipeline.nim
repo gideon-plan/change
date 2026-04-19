@@ -14,18 +14,18 @@ import basis/code/choice
 
 suite "framing":
   test "encode/decode round-trip":
-    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42,
+    let frame = ChangeFrame(tier: ChangeTier.Raw, kind: ChangeFrameKind.Changeset, seq_no: 42,
                          payload: @[1'u8, 2, 3, 4, 5])
     let encoded = encode_frame(frame)
     let decoded = decode_frame(encoded)
     check decoded.is_good
-    check decoded.val.tier == tierRaw
-    check decoded.val.kind == fkChangeset
+    check decoded.val.tier == ChangeTier.Raw
+    check decoded.val.kind == ChangeFrameKind.Changeset
     check decoded.val.seq_no == 42
     check decoded.val.payload == @[1'u8, 2, 3, 4, 5]
 
   test "empty payload":
-    let frame = ChangeFrame(tier: tierDelta, kind: fkAck, seq_no: 1, payload: @[])
+    let frame = ChangeFrame(tier: ChangeTier.Delta, kind: ChangeFrameKind.Ack, seq_no: 1, payload: @[])
     let encoded = encode_frame(frame)
     let decoded = decode_frame(encoded)
     check decoded.is_good
@@ -41,14 +41,14 @@ suite "framing":
 
 suite "chunking":
   test "small frame produces single chunk":
-    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
+    let frame = ChangeFrame(tier: ChangeTier.Raw, kind: ChangeFrameKind.Changeset, seq_no: 1,
                          payload: @[1'u8, 2, 3])
     let chunks = split_frame(frame)
     check chunks.len == 1
     check chunks[0].total_chunks == 1
 
   test "reassemble single chunk":
-    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 1,
+    let frame = ChangeFrame(tier: ChangeTier.Raw, kind: ChangeFrameKind.Changeset, seq_no: 1,
                          payload: @[10'u8, 20, 30])
     let chunks = split_frame(frame)
     let result = reassemble_chunks(chunks)
@@ -59,7 +59,7 @@ suite "chunking":
   test "large frame splits and reassembles":
     var payload = newSeq[byte](200)
     for i in 0 ..< 200: payload[i] = byte(i mod 256)
-    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 99, payload: payload)
+    let frame = ChangeFrame(tier: ChangeTier.Raw, kind: ChangeFrameKind.Changeset, seq_no: 99, payload: payload)
     let chunks = split_frame(frame, max_size = 100)
     check chunks.len > 1
     let result = reassemble_chunks(chunks)
@@ -118,11 +118,11 @@ suite "receiver":
   test "dispatch to handler":
     var received_seq: uint64 = 0
     var recv = init_receiver()
-    recv.set_handler(tierRaw, proc(f: ChangeFrame): Choice[bool] {.raises: [].} =
+    recv.set_handler(ChangeTier.Raw, proc(f: ChangeFrame): Choice[bool] {.raises: [].} =
       received_seq = f.seq_no
       good(true)
     )
-    let frame = ChangeFrame(tier: tierRaw, kind: fkChangeset, seq_no: 42, payload: @[])
+    let frame = ChangeFrame(tier: ChangeTier.Raw, kind: ChangeFrameKind.Changeset, seq_no: 42, payload: @[])
     let encoded = encode_frame(frame)
     let result = recv.dispatch(encoded)
     check result.is_good
@@ -130,7 +130,7 @@ suite "receiver":
 
   test "no handler returns bad":
     let recv = init_receiver()
-    let frame = ChangeFrame(tier: tierDelta, kind: fkChangeset, seq_no: 1, payload: @[])
+    let frame = ChangeFrame(tier: ChangeTier.Delta, kind: ChangeFrameKind.Changeset, seq_no: 1, payload: @[])
     let encoded = encode_frame(frame)
     let result = recv.dispatch(encoded)
     check result.is_bad
@@ -143,27 +143,27 @@ import change/negotiate
 
 suite "negotiate":
   test "encode/decode capability round-trip":
-    let cap = Capability(tiers: {tierRaw, tierDelta}, schema_version: 3, last_seq: 42)
+    let cap = Capability(tiers: {ChangeTier.Raw, ChangeTier.Delta}, schema_version: 3, last_seq: 42)
     let encoded = encode_capability(cap)
     let decoded = decode_capability(encoded)
     check decoded.is_good
-    check tierRaw in decoded.val.tiers
-    check tierDelta in decoded.val.tiers
-    check tierCompact notin decoded.val.tiers
+    check ChangeTier.Raw in decoded.val.tiers
+    check ChangeTier.Delta in decoded.val.tiers
+    check ChangeTier.Compact notin decoded.val.tiers
     check decoded.val.schema_version == 3
     check decoded.val.last_seq == 42
 
   test "negotiate common tiers":
-    let sender = Capability(tiers: {tierRaw, tierDelta}, schema_version: 2, last_seq: 10)
-    let receiver = Capability(tiers: {tierDelta, tierCompact}, schema_version: 3, last_seq: 5)
+    let sender = Capability(tiers: {ChangeTier.Raw, ChangeTier.Delta}, schema_version: 2, last_seq: 10)
+    let receiver = Capability(tiers: {ChangeTier.Delta, ChangeTier.Compact}, schema_version: 3, last_seq: 5)
     let resp = negotiate(sender, receiver)
     check resp.accepted
-    check tierDelta in resp.receiver_caps.tiers
+    check ChangeTier.Delta in resp.receiver_caps.tiers
     check resp.resume_from == 10
 
   test "negotiate no common tiers":
-    let sender = Capability(tiers: {tierRaw}, schema_version: 1, last_seq: 0)
-    let receiver = Capability(tiers: {tierCompact}, schema_version: 1, last_seq: 0)
+    let sender = Capability(tiers: {ChangeTier.Raw}, schema_version: 1, last_seq: 0)
+    let receiver = Capability(tiers: {ChangeTier.Compact}, schema_version: 1, last_seq: 0)
     let resp = negotiate(sender, receiver)
     check not resp.accepted
 
@@ -175,20 +175,20 @@ import change/sp_binding
 
 suite "sp_binding":
   test "make negotiate frame":
-    let cap = Capability(tiers: {tierRaw}, schema_version: 1, last_seq: 0)
+    let cap = Capability(tiers: {ChangeTier.Raw}, schema_version: 1, last_seq: 0)
     let frame = make_negotiate_frame(cap)
-    check frame.kind == fkSync
+    check frame.kind == ChangeFrameKind.Sync
     check frame.payload.len == 13
 
   test "make ack frame":
     let frame = make_ack_frame(42)
-    check frame.kind == fkAck
+    check frame.kind == ChangeFrameKind.Ack
     check frame.seq_no == 42
 
   test "make changeset frame":
-    let frame = make_changeset_frame(tierDelta, 10, @[1'u8, 2, 3])
-    check frame.tier == tierDelta
-    check frame.kind == fkChangeset
+    let frame = make_changeset_frame(ChangeTier.Delta, 10, @[1'u8, 2, 3])
+    check frame.tier == ChangeTier.Delta
+    check frame.kind == ChangeFrameKind.Changeset
     check frame.seq_no == 10
     check frame.payload == @[1'u8, 2, 3]
 
@@ -228,7 +228,7 @@ suite "delta_compress":
     var dc = init_compressor()
     let r = dc.compress(1, @[1'u8, 2, 3], proc(s, t: seq[byte]): string = "delta")
     check r.is_good
-    check r.val.tier == tierRaw
+    check r.val.tier == ChangeTier.Raw
 
   test "second message uses delta if smaller":
     var dc = init_compressor()
@@ -236,7 +236,7 @@ suite "delta_compress":
     discard dc.compress(1, big, proc(s, t: seq[byte]): string = "small")
     let r = dc.compress(2, big, proc(s, t: seq[byte]): string = "small")
     check r.is_good
-    check r.val.tier == tierDelta
+    check r.val.tier == ChangeTier.Delta
 
   test "falls back to raw if delta is larger":
     var dc = init_compressor()
@@ -244,7 +244,7 @@ suite "delta_compress":
     discard dc.compress(1, small, proc(s, t: seq[byte]): string = "this delta is much larger than the original data!!!")
     let r = dc.compress(2, small, proc(s, t: seq[byte]): string = "this delta is much larger than the original data!!!")
     check r.is_good
-    check r.val.tier == tierRaw
+    check r.val.tier == ChangeTier.Raw
 
 # =====================================================================================================================
 # replay

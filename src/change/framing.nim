@@ -8,17 +8,17 @@
 import basis/code/choice
 
 type
-  ChangeTier* = enum
-    tierRaw = 0       ## Raw changeset blob
-    tierDelta = 1     ## Delta-encoded changeset
-    tierCompact = 2   ## Compacted (multiple changesets merged)
+  ChangeTier* {.pure.} = enum
+    Raw = 0       ## Raw changeset blob
+    Delta = 1     ## Delta-encoded changeset
+    Compact = 2   ## Compacted (multiple changesets merged)
 
-  ChangeFrameKind* = enum
-    fkChangeset = 1   ## Changeset data
-    fkAck = 2         ## Acknowledgement
-    fkNack = 3        ## Negative acknowledgement
-    fkSync = 4        ## Sync request
-    fkPing = 5        ## Keepalive
+  ChangeFrameKind* {.pure.} = enum
+    Changeset = 1   ## Changeset data
+    Ack = 2         ## Acknowledgement
+    Nack = 3        ## Negative acknowledgement
+    Sync = 4        ## Sync request
+    Ping = 5        ## Keepalive
 
   ChangeFrame* = object
     tier*: ChangeTier

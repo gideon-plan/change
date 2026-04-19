@@ -29,9 +29,9 @@ func encode_capability*(cap: Capability): seq[byte] =
   ## Encode capability to bytes: [tier_mask:1][schema:4][last_seq:8]
   result = newSeq[byte](13)
   var mask: byte = 0
-  if tierRaw in cap.tiers: mask = mask or 1
-  if tierDelta in cap.tiers: mask = mask or 2
-  if tierCompact in cap.tiers: mask = mask or 4
+  if ChangeTier.Raw in cap.tiers: mask = mask or 1
+  if ChangeTier.Delta in cap.tiers: mask = mask or 2
+  if ChangeTier.Compact in cap.tiers: mask = mask or 4
   result[0] = mask
   let sv = uint32(cap.schema_version)
   result[1] = byte(sv shr 24)
@@ -46,9 +46,9 @@ func decode_capability*(data: openArray[byte]): Choice[Capability] =
   if data.len < 13:
     return bad[Capability]("change", "capability too short")
   var tiers: set[ChangeTier] = {}
-  if (data[0] and 1) != 0: tiers.incl(tierRaw)
-  if (data[0] and 2) != 0: tiers.incl(tierDelta)
-  if (data[0] and 4) != 0: tiers.incl(tierCompact)
+  if (data[0] and 1) != 0: tiers.incl(ChangeTier.Raw)
+  if (data[0] and 2) != 0: tiers.incl(ChangeTier.Delta)
+  if (data[0] and 4) != 0: tiers.incl(ChangeTier.Compact)
   let sv = (uint32(data[1]) shl 24) or (uint32(data[2]) shl 16) or
            (uint32(data[3]) shl 8) or uint32(data[4])
   var last_seq: uint64 = 0

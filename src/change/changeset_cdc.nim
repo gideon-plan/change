@@ -16,7 +16,7 @@ type
     tier*: ChangeTier
     binding*: HydraChangeBinding
 
-proc init_changeset_publisher*(endpoint: string, tier: ChangeTier = tierRaw,
+proc init_changeset_publisher*(endpoint: string, tier: ChangeTier = ChangeTier.Raw,
                                 cache_size: int = 64): ChangesetPublisher =
   ChangesetPublisher(
     cache: init_cache(cache_size),

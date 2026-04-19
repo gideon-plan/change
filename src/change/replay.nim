@@ -9,9 +9,9 @@ import std/strutils
 import basis/code/choice
 
 type
-  ReplayMode* = enum
-    rmDirect   ## Generate INSERT/UPDATE/DELETE SQL directly
-    rmRbu      ## Generate RBU staging database SQL
+  ReplayMode* {.pure.} = enum
+    Direct   ## Generate INSERT/UPDATE/DELETE SQL directly
+    Rbu      ## Generate RBU staging database SQL
 
   ReplayStatement* = object
     sql*: string
